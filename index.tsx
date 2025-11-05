@@ -1,7 +1,9 @@
-// FIX: Replaced UMD global 'React' with module import.
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, StrictMode } from 'react';
-// FIX: Added import for ReactDOM to fix UMD global and createRoot errors.
-import ReactDOM from 'react-dom/client';
+// Fix: Add imports for React and ReactDOM as this file is a module.
+import * as React from 'react';
+import * as ReactDOM from 'react-dom/client';
+
+const { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, StrictMode } = React;
+const { createRoot } = ReactDOM;
 
 // --- TYPES ---
 // Defined interfaces for our data structures.
@@ -71,7 +73,6 @@ const generateDocketData = (docketId: string, isCrewDocket: boolean): DocketData
   };
 };
 
-// FIX: Added types for function parameters and a Promise return type to resolve type inference issues.
 const submitDocketSignature = (docketId: string, clientName: string): Promise<string> => {
     return new Promise(resolve => {
         setTimeout(() => {
@@ -132,7 +133,6 @@ const SignaturePadWrapper = forwardRef((props, ref) => {
 
   useEffect(() => {
     if (canvasRef.current) {
-      // FIX: Cast window to `any` to access SignaturePad, which is loaded from a script tag.
       signaturePadRef.current = new (window as any).SignaturePad(canvasRef.current, {
         backgroundColor: 'rgb(255, 255, 255)',
       });
@@ -229,8 +229,7 @@ const SigningPage = ({ docketId, isCrewDocket, onBack }: { docketId: string; isC
         setSuccessMessage(message);
         setSubmissionStatus('success');
     } catch (e) {
-        setSubmissionStatus('error');
-        // FIX: The caught error `e` is of type `unknown`. Added `instanceof Error` check to safely access the error message.
+        setSubmissionStatus('pending');
         if (e instanceof Error) {
             showToast(e.message || 'Failed to submit signature.', 'error');
         } else {
@@ -436,7 +435,7 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-const root = ReactDOM.createRoot(rootElement);
+const root = createRoot(rootElement);
 root.render(
   <StrictMode>
     <App />
