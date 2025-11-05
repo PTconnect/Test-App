@@ -1,0 +1,5 @@
+{
+  "name": "PT-Connect Docket Signing App",
+  "description": "A web application for clients to review and sign dockets and timesheets.",
+  "requestFramePermissions": []
+}
