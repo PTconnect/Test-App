@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PT-Connect | Sign Docket</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.7/signature_pad.umd.min.js"></script>
+
+  <!-- React Libraries -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  
+  <!-- Babel Compiler -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; }
+    .brand-header { background-color: #1e528c; } 
+    .brand-button { background-color: #ffbc0d; color: #1f2937; } 
+    .brand-button:hover { background-color: #e6a900; }
+    .loader { border: 4px solid #f3f3f3; border-top: 4px solid #1e528c; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .form-label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 4px; }
+    .form-input, .form-select { display: block; width: 100%; padding: 0.5rem 0.75rem; font-size: 1rem; border: 1px solid #d1d5db; border-radius: 0.375rem; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); background-color: white; }
+    .signature-pad-canvas { border: 2px solid #9ca3af; border-radius: 8px; background: #ffffff; cursor: crosshair; width: 100%; height: 150px; }
+    .disabled-field { background-color: #f3f4f6; opacity: 0.7; cursor: not-allowed; }
+    .required-star { color: #ef4444; }
+    #toast { visibility: hidden; min-width: 250px; margin-left: -125px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 9999; left: 50%; bottom: 30px; opacity: 0; transition: opacity 0.5s, bottom 0.5s, visibility 0.5s; }
+    #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // --- MOCK DATA SERVICE ---
+    const geminiService = {
+      generateDocketData: async (docketType) => {
+        console.log(`Generating mock data for: ${docketType}`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+        
+        const isCrew = docketType === 'crew';
+
+        const supervisorDocket = {
+          docketId: `D-${Math.floor(1000 + Math.random() * 9000)}`,
+          projectName: 'Central City Tunnel Project',
+          date: new Date().toLocaleDateString('en-AU'),
+          supervisorName: 'Nicky Hadden',
+          clientEmail: 'client.approver@example.com',
+          supervisorSignature: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAABkCAYAAACHdYvPAAAAAXNSR0IArs4c6QAAArFJREFUeF7t1zFuE2EQheEbESp0hI7StpQEJIEhyEmgYxfoCJ1gSbgDR2iIXwCSUp2jB1YkF+zM+pL/fM8LhmEYhmEYhmEYhmEYhmEYhmEYhmEYhmEYhmEYhmEYhmGY/8m279d+v4/neX9/f/f7/a+9/wLgL7d+v6/X6+v1+n6/L+f5/b+P/30A+Mrt23a/3+/r9fp+v3/f9/39/T08z6/X69f9DuAft2/b/b5e1/X1el3X9b7vl/P8/n6/Xq//3ncA/vB1Xb/f7/f7/Xq9rqv6/b7v+77v+z7v+wBwfP/fD+A/v/a4ruu6ruu6ruv6fb+u6/v9fr/fHwB+8b193/f9fl+v1/f7/Xq9ruu6ruu6ruv6fr8/AHx53/f9fl+v1/f7/Xq9rmu/X3sA+PL/AP4D/PMtWZblt22bZVmWZVmWZVkWxzG2bdsyzbMsS5Ik4ziWsxzbtozjeBzHPM8sS2LbdhiGZFkSxzG+7zPNEsdxHMdxHMfxPS/L+n5/siyL4ziWZVFSSpIkSZIky/L7/X6/f9/3fV/3fr+u68uyLOd5/H5/siyL4ziWY5kkiZIkSXsex3Ecx/M8S5KkLEsSRAiCIAjDMIxleX6/v+97kiS2bcvzPEnSsiyiKIqiKArDcBzHPM8sS5KE4DjO8zyOIzRNsyyL4zjLsixLkjzPCUEQBEEQBEG2bfP8/n7f932/v9/v9/f39/f3x/M8v9/v63Vd13Vd1/X9fl+v63Vdv9/v6/X6fr+u6/p+v3/f9/39/T08z/P7+7ver/8G4F/bhmEYhmEYhmEYhmEYhmEYhmEYhmEYhmEYhmEYhmEYhmGY/ck/AG2aGS/g4vGAAAAAAElFTkSuQmCC',
+          lineItems: [
+            { resourceType: 'People', resourceID: 'John Smith', role: 'Operator', quantity: 9.5, uom: 'Hr', scope: 'Excavation of trench section A' },
+            { resourceType: 'Plant', resourceID: 'EX-01 - Komatsu PC200', role: 'Excavator', quantity: 8.0, uom: 'Hr', scope: 'Trenching' },
+            { resourceType: 'Materials', resourceID: 'Crushed Rock', role: '', quantity: 20, uom: 'tonne', scope: 'Backfill' },
+          ],
+        };
+
+        const crewDocket = {
+          docketId: `C-${Math.floor(1000 + Math.random() * 9000)}`,
+          projectName: 'Western Highway Upgrade',
+          date: new Date().toLocaleDateString('en-AU'),
+          supervisorName: 'David Lee', // Employee Name
+          clientEmail: 'supervisor.approver@example.com',
+          supervisorSignature: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAABkCAYAAACHdYvPAAAAAXNSR0IArs4c6QAAAqVJREFUeF7t1zFqElEQBeAXkYpeoouIbiHiK3QVLsFF6Cp6CPYQnCAix21gIYyQP8z7Mv/3vC8Igj5J63a/Xq/X6/X6fr/v+wBwmq7rfr+v1+v1er3v+77v+wBwmu/7/X5fr9fr9Xrf9/0AXKfrut/v63Vd13Vd1/f7/X6/v7+v6/p+v/5/AHCfrut+v6/XdV3XdV3X9f1+v9/v7+/r+n6//jMAv6vrut/v63Vd13Vd1/X9fr/f7+/v6/p+vz8A/Gu7ruv6/b5e13Vd13Vd1/X9fr/f7+/v6/p+vz8AvG/btv1+v9/v9/V6XVf2+/2+7/u+f1/X9f1+/z8A/PF+v+/7vu/7vu/7vt/v6/V6vV7X9f1+f/9/APCv7du2bdu2bdu2bdu2bdu2bdsyzbMsS5Ik4ziWsxzbtozjeBzHPM8sS2LbdhiGZFkSxzG+7zPNEsdxHMdxHMfxPS/L+n5/siyL4ziWY5kkiZIkSXsex3Ecx/M8S5KkLEsSRAiCIAjDMIxleX6/v+97kiS2bcvzPEnSsiyiKIqiKArDcBzHPM8sS5KE4DjO8zyOIzRNsyyL4zjLsixLkjzPCUEQBEG2bdu2bds2v9/v6/V6vV6v1+v1el3XdV3XdV3XdV3XdV3XdV3XdV3X9f1+f/8k/wGco3Xk+p91ngAAAABJRU5ErkJggg==',
+          lineItems: [
+            { resourceType: 'People', resourceID: 'David Lee', role: 'Pipe Layer', quantity: 10, uom: 'Hr', scope: 'Installation of stormwater pipes' },
+            { resourceType: 'Plant', resourceID: 'TL-03 - CAT 950M', role: 'Loader', quantity: 8.0, uom: 'Hr', scope: 'Moving materials' },
+            { resourceType: 'Other', resourceID: 'Safety Gear Supplier', role: '', quantity: 1, uom: 'item', scope: 'New high-vis vest' },
+          ],
+        };
+
+        return isCrew ? crewDocket : supervisorDocket;
+      },
+      submitDocketSignature: async (docketId) => {
+        console.log(`Submitting signature for: ${docketId}`);
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+        return `Docket ${docketId} has been successfully signed and submitted. A confirmation email has been sent to all parties.`;
+      }
+    };
+    
+    // --- ICON COMPONENTS ---
+    const CheckCircleIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+      </svg>
+    );
+
+    // --- GENERIC COMPONENTS ---
+    const Loader = ({ text }) => (
+      <div className="flex flex-col justify-center items-center p-10 h-64">
+        <div className="loader"></div>
+        <p className="mt-4 text-gray-600 font-semibold">{text}</p>
+      </div>
+    );
+
+    const Toast = ({ message, type, onDismiss }) => {
+      useEffect(() => {
+        if (message) {
+          const timer = setTimeout(() => {
+            onDismiss();
+          }, 5000);
+          return () => clearTimeout(timer);
+        }
+      }, [message, onDismiss]);
+
+      if (!message) return null;
+
+      const bgColor = type === 'error' ? '#dc2626' : '#16a34a';
+
+      return (
+        <div id="toast" className="show" style={{ backgroundColor: bgColor }}>
+          {message}
+        </div>
+      );
+    };
+
+    // --- SIGNATURE PAD WRAPPER ---
+    const SignaturePadWrapper = ({ onReady }) => {
+      const canvasRef = useRef(null);
+
+      useEffect(() => {
+        if (canvasRef.current) {
+          const canvas = canvasRef.current;
+          let signaturePad = new SignaturePad(canvas, {
+            backgroundColor: 'rgb(255, 255, 255)'
+          });
+
+          const resizeCanvas = () => {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            canvas.width = canvas.offsetWidth * ratio;
+            canvas.height = canvas.offsetHeight * ratio;
+            canvas.getContext("2d").scale(ratio, ratio);
+            signaturePad.clear();
+          };
+          
+          window.addEventListener("resize", resizeCanvas);
+          resizeCanvas();
+          
+          onReady(signaturePad);
+
+          return () => {
+            window.removeEventListener("resize", resizeCanvas);
+          };
+        }
+      }, [onReady]);
+
+      return <canvas ref={canvasRef} className="signature-pad-canvas"></canvas>;
+    };
+
+    // --- MAIN SIGNING PAGE COMPONENT ---
+    const SigningPage = ({ docketType, onBack }) => {
+      const [docketData, setDocketData] = useState(null);
+      const [isLoading, setIsLoading] = useState(true);
+      const [toast, setToast] = useState({ message: '', type: 'success' });
+      const [clientName, setClientName] = useState('');
+      const [clientNotes, setClientNotes] = useState('');
+      const [isSigned, setIsSigned] = useState(false);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [submissionResult, setSubmissionResult] = useState(null);
+
+      const clientSigPadRef = useRef(null);
+
+      const showToast = useCallback((message, type = 'success') => {
+        setToast({ message, type });
+      }, []);
+      
+      useEffect(() => {
+        const fetchDocket = async () => {
+          setIsLoading(true);
+          try {
+            const data = await geminiService.generateDocketData(docketType);
+            setDocketData(data);
+          } catch (error) {
+            console.error("Failed to fetch docket data:", error);
+            showToast('Failed to load docket data. Please try again.', 'error');
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        fetchDocket();
+      }, [docketType, showToast]);
+
+      const clearPad = () => {
+        if (clientSigPadRef.current) {
+          clientSigPadRef.current.on();
+          clientSigPadRef.current.clear();
+          setIsSigned(false);
+        }
+      };
+
+      const acceptSignature = () => {
+        if (clientSigPadRef.current && !clientSigPadRef.current.isEmpty()) {
+          clientSigPadRef.current.off();
+          setIsSigned(true);
+          showToast('Signature accepted!');
+        } else {
+          showToast('Please provide a signature before accepting.', 'error');
+        }
+      };
+      
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!clientName.trim()) {
+          showToast('Please enter your full name.', 'error');
+          return;
+        }
+        if (clientSigPadRef.current.isEmpty()) {
+            showToast('Please provide your signature.', 'error');
+            return;
+        }
+        if (!isSigned) {
+          showToast('Please click "Accept" to lock in your signature.', 'error');
+          return;
+        }
+
+        setIsSubmitting(true);
+        try {
+          const resultMessage = await geminiService.submitDocketSignature(docketData.docketId);
+          setSubmissionResult(resultMessage);
+        } catch(error) {
+          console.error("Submission failed:", error);
+          showToast('An error occurred during submission.', 'error');
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      if (isLoading) {
+        return <Loader text={`Loading ${docketType === 'crew' ? 'Crew Timesheet' : 'Docket'} for Signing...`} />;
+      }
+      
+      if (submissionResult) {
+        return (
+          <div className="bg-white p-6 rounded-lg shadow-md text-center max-w-4xl mx-auto">
+            <div className="flex justify-center mb-4"><CheckCircleIcon /></div>
+            <h2 className="text-2xl font-bold text-green-600">Submission Successful!</h2>
+            <p className="mt-2">{submissionResult}</p>
+            <p className="mt-4">You may now close this window.</p>
+            <button onClick={onBack} className="mt-6 brand-button font-bold py-2 px-4 rounded-lg">
+              Back to Start
+            </button>
+          </div>
+        );
+      }
+
+      if (!docketData) {
+        return <div className="text-center text-red-500">Could not load docket data.</div>;
+      }
+      
+      const isCrewDocket = docketType === 'crew';
+
+      return (
+        <form id="client-sig-form" onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md space-y-4 mb-6">
+            <h3 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-2 mb-4">Docket Details</h3>
+            <div><label className="form-label">Docket ID</label><input type="text" value={docketData.docketId} className="form-input disabled-field" readOnly /></div>
+            <div><label className="form-label">Project</label><input type="text" value={docketData.projectName} className="form-input disabled-field" readOnly /></div>
+            <div><label className="form-label">Date</label><input type="text" value={docketData.date} className="form-input disabled-field" readOnly /></div>
+            <div><label className="form-label">{isCrewDocket ? 'Employee' : 'Supervisor'}</label><input type="text" value={docketData.supervisorName} className="form-input disabled-field" readOnly /></div>
+          </div>
+          
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md space-y-4 mb-6">
+            <h3 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-2 mb-4">Docket Line Items</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resource</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scope</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {docketData.lineItems.map((item, index) => (
+                    <tr key={index}>
+                      <td className="px-4 py-3 text-sm text-gray-700">{item.resourceType}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{item.resourceID}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{item.role}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{item.quantity} {item.uom}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{item.scope}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md space-y-4 mb-6">
+            <h3 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-2 mb-4">{isCrewDocket ? 'Employee' : 'Supervisor'} Signature</h3>
+            <div className="flex justify-center p-4 bg-gray-100 rounded-lg">
+              <img src={docketData.supervisorSignature} alt="Supervisor Signature" className="h-16 w-auto border border-gray-300" />
+            </div>
+          </div>
+
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md space-y-4 mb-6">
+            <h3 className="text-xl font-bold text-gray-800 border-b border-gray-300 pb-2 mb-4">Your Approval</h3>
+            <div>
+              <label htmlFor="clientName" className="form-label">Your Full Name <span className="required-star">*</span></label>
+              <input type="text" id="clientName" value={clientName} onChange={(e) => setClientName(e.target.value)} required className="form-input" placeholder="Please print your name" />
+            </div>
+            <div>
+              <label htmlFor="clientEmail" className="form-label">Your Email <span className="required-star">*</span></label>
+              <input type="email" id="clientEmail" value={docketData.clientEmail} required className="form-input disabled-field" readOnly />
+            </div>
+            <div>
+              <label htmlFor="clientNotes" className="form-label">Notes / Comments (Optional)</label>
+              <textarea id="clientNotes" value={clientNotes} onChange={(e) => setClientNotes(e.target.value)} rows="2" className="form-input" placeholder="e.g., Approved, pending verification of..."></textarea>
+            </div>
+            <div>
+              <label className="form-label">Your Signature <span className="required-star">*</span></label>
+              <div className="relative">
+                <SignaturePadWrapper onReady={(pad) => { clientSigPadRef.current = pad; }} />
+                <div className="text-xs absolute top-1 right-1">
+                  {!isSigned ? (
+                    <React.Fragment>
+                      <button type="button" onClick={acceptSignature} className="text-green-600 hover:text-green-800 font-medium">Accept</button>
+                      <span className="text-gray-300"> | </span>
+                      <button type="button" onClick={clearPad} className="text-red-600 hover:text-red-800 font-medium">Clear</button>
+                    </React.Fragment>
+                  ) : (
+                    <React.Fragment>
+                      <span className="text-green-600 font-bold"><i className="fa-solid fa-check-circle"></i> Accepted</span>
+                      <span className="text-gray-300"> | </span>
+                      <button type="button" onClick={clearPad} className="text-red-600 hover:text-red-800 font-medium">Reset</button>
+                    </React.Fragment>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 pb-12">
+            <button type="submit" disabled={isSubmitting} className="w-full brand-button font-bold py-3 px-6 rounded-lg shadow-lg text-lg transition duration-150 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              {isSubmitting ? (
+                <><div className="loader !h-6 !w-6 !border-t-slate-800"></div> Submitting...</>
+              ) : (
+                <><i className="fa-solid fa-check-circle"></i> Approve & Submit {isCrewDocket ? 'Timesheet' : 'Signature'}</>
+              )}
+            </button>
+          </div>
+          <Toast message={toast.message} type={toast.type} onDismiss={() => setToast({ message: '', type: 'success' })} />
+        </form>
+      );
+    };
+
+    // --- APP ROOT COMPONENT ---
+    const App = () => {
+      const [appState, setAppState] = useState('select'); // 'select', 'signing'
+      const [docketType, setDocketType] = useState(null); // 'supervisor', 'crew'
+
+      const handleSelectDocket = (type) => {
+        setDocketType(type);
+        setAppState('signing');
+      };
+      
+      const handleBackToStart = () => {
+        setDocketType(null);
+        setAppState('select');
+      };
+
+      return (
+        <div className="min-h-screen">
+          <header className="brand-header text-white shadow-md p-4 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <img src="https://i.imgur.com/MHmkAdn.png" alt="PT-Connect Logo" className="h-8 w-auto" />
+              <h1 className="text-xl sm:text-2xl font-bold">PT-CONNECT | Client Signature</h1>
+            </div>
+          </header>
+
+          <main className="p-4 sm:p-6 lg:p-8">
+            {appState === 'select' && (
+               <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md text-center">
+                 <h2 className="text-2xl font-bold text-gray-800">Select a Document to Sign</h2>
+                 <p className="mt-2 text-gray-600">Please choose the type of document you need to approve.</p>
+                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <button onClick={() => handleSelectDocket('supervisor')} className="brand-button font-bold py-3 px-6 rounded-lg shadow-lg text-lg">
+                     Load Supervisor Docket
+                   </button>
+                   <button onClick={() => handleSelectDocket('crew')} className="brand-button font-bold py-3 px-6 rounded-lg shadow-lg text-lg">
+                     Load Crew Timesheet
+                   </button>
+                 </div>
+               </div>
+            )}
+            
+            {appState === 'signing' && (
+              <SigningPage docketType={docketType} onBack={handleBackToStart} />
+            )}
+          </main>
+        </div>
+      );
+    };
+
+    const container = document.getElementById('root');
+    const root = ReactDOM.createRoot(container);
+    root.render(<App />);
+  </script>
+</body>
+</html>
