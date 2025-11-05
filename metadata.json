@@ -1,5 +1,0 @@
-{
-  "name": "PT-Connect Docket Signature",
-  "description": "A web application for clients to review, approve, and electronically sign daily dockets and crew timesheets. Users can view docket details and line items before providing their name, comments, and a digital signature to finalize the approval process.",
-  "requestFramePermissions": []
-}
